@@ -22,12 +22,13 @@ def read_test_events(filename):
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
+        event_id = event.get('testID', event.get('test', {}).get('id'))
         if event.get('type') == 'testStart':
             test = event.get('test', {})
-            started[event.get('testID')] = (test.get('name', 'unknown'), event.get('time', 0))
-        elif event.get('type') == 'testDone':
-            name, begin = started.get(event.get('testID'), (f"test-{event.get('testID')}", event.get('time', 0)))
-            result = 'NOT RUN' if event.get('skipped') else ('PASSED' if event.get('result') == 'success' else 'FAILED')
+            started[event_id] = (test.get('name', 'unknown'), event.get('time', 0), test.get('metadata', {}).get('skip', False))
+        elif event.get('type') == 'testDone' and not event.get('hidden', False):
+            name, begin, metadata_skip = started.get(event_id, (f"test-{event_id}", event.get('time', 0), False))
+            result = 'NOT RUN' if event.get('skipped') or metadata_skip else ('PASSED' if event.get('result') == 'success' else 'FAILED')
             cases.append({'name': name, 'status': result, 'duration_seconds': round(max(0, event.get('time', begin) - begin) / 1000, 3), 'error': str(event.get('error', ''))[:2000] if result == 'FAILED' else None})
     return cases
 

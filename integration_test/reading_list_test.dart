@@ -6,7 +6,7 @@ import 'package:flutter_testability_lab/main.dart' as app;
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('GUI-01 add a book and capture the running app', (tester) async {
-    app.main();
+    await app.main();
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('title-input')), 'GUI smoke book');
     await tester.tap(find.byKey(const Key('add-book')));
