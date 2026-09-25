@@ -13,7 +13,7 @@ See [the Gherkin requirements](docs/requirements/reading-list.feature). Automate
 | BDD | BOOK-ADD-01, BOOK-VALID-01, BOOK-SEARCH-01, IMPORT-01 | `flutter test test/bdd_test.dart` |
 | Widget | WID-ADD-01, WID-ERR-01 | `flutter test test/widget_test.dart` |
 | GUI/E2E | GUI-01 | `flutter test integration_test -d <emulator-id>` |
-| Persistence | PER-01 | requires emulator/device verification (not yet automated) |
+| Persistence | PER-01 | CI integration flow adds through UI, force-stops/relaunches app, verifies restored entry in rendered Android UI hierarchy |
 | Service | SVC-01 | controlled importer tests; no network |
 | Build/smoke | Android APK + GUI scenario | `flutter build apk --debug` |
 

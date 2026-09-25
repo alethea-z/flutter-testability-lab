@@ -24,7 +24,14 @@ jobs:
       - name: Fast unit, BDD and widget tests
         id: fast
         continue-on-error: true
-        run: flutter test --reporter expanded
+        run: |
+          mkdir -p artifacts
+          set +e
+          flutter test --reporter=json > artifacts/fast-tests.json 2> artifacts/fast-tests.stderr
+          test_rc=$?
+          flutter test test/bdd_test.dart --reporter=json > artifacts/bdd-tests.json 2> artifacts/bdd-tests.stderr
+          bdd_rc=$?
+          test $test_rc -eq 0 && test $bdd_rc -eq 0
       - name: Start Android emulator and run GUI / persistence tests
         id: gui
         continue-on-error: true
@@ -34,11 +41,21 @@ jobs:
           arch: x86_64
           profile: pixel_2
           script: |
-            flutter test integration_test -d emulator-5554 --reporter expanded
             mkdir -p artifacts/screenshots
+            set +e
+            flutter test integration_test -d emulator-5554 --reporter=json > artifacts/gui-tests.json 2> artifacts/gui-tests.stderr
+            test_rc=$?
+            adb shell am force-stop de.alethea.flutter_testability_lab
             adb shell monkey -p de.alethea.flutter_testability_lab 1
-            sleep 5
+            sleep 8
+            adb shell uiautomator dump /sdcard/window.xml >/dev/null
+            adb pull /sdcard/window.xml artifacts/restarted-ui.xml
+            python3 -c "import pathlib,sys; text=pathlib.Path('artifacts/restarted-ui.xml').read_text(); sys.exit(0 if 'GUI smoke book' in text else 1)"
+            persist_rc=$?
+            echo "$persist_rc" > artifacts/persistence.exit
             adb exec-out screencap -p > artifacts/screenshots/gui-smoke.png
+            test $test_rc -eq 0 && test $persist_rc -eq 0
+          
       - name: Build Android APK
         id: build
         if: always()
@@ -61,6 +78,10 @@ jobs:
           path: |
             artifacts/report.md
             artifacts/report.json
+            artifacts/*.json
+            artifacts/*.stderr
+            artifacts/persistence.exit
+            artifacts/restarted-ui.xml
             artifacts/screenshots/**
             build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: warn
