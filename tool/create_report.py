@@ -16,6 +16,8 @@ def read_test_events(filename):
     if not path.exists():
         return []
     started = {}
+    failures = {}
+    finished = set()
     cases = []
     for line in path.read_text(errors='replace').splitlines():
         try:
@@ -26,10 +28,19 @@ def read_test_events(filename):
         if event.get('type') == 'testStart':
             test = event.get('test', {})
             started[event_id] = (test.get('name', 'unknown'), event.get('time', 0), test.get('metadata', {}).get('skip', False))
+        elif event.get('type') in ('error', 'print') and event_id is not None:
+            message = event.get('error') or event.get('message')
+            if message:
+                failures.setdefault(event_id, []).append(str(message))
         elif event.get('type') == 'testDone' and not event.get('hidden', False):
             name, begin, metadata_skip = started.get(event_id, (f"test-{event_id}", event.get('time', 0), False))
             result = 'NOT RUN' if event.get('skipped') or metadata_skip else ('PASSED' if event.get('result') == 'success' else 'FAILED')
-            cases.append({'name': name, 'status': result, 'duration_seconds': round(max(0, event.get('time', begin) - begin) / 1000, 3), 'error': str(event.get('error', ''))[:2000] if result == 'FAILED' else None})
+            finished.add(event_id)
+            details = event.get('error') or chr(10).join(failures.get(event_id, []))
+            cases.append({'name': name, 'status': result, 'duration_seconds': round(max(0, event.get('time', begin) - begin) / 1000, 3), 'error': str(details)[-4000:] if result == 'FAILED' else None})
+    for event_id, (name, begin, metadata_skip) in started.items():
+        if event_id not in finished:
+            cases.append({'name': name, 'status': 'NOT RUN', 'duration_seconds': None, 'error': None})
     return cases
 
 flutter = run(['flutter', '--version']).splitlines()[0] or 'unknown'
@@ -49,7 +60,7 @@ run_url = os.getenv('REPORT_ARTIFACT_URL', '')
 failure_details = []
 for case in cases:
     if case['status'] == 'FAILED':
-        failure_details.append(f"Test case failed: {case['name']}\\n{case.get('error') or ''}")
+        failure_details.append(f"Test case failed: {case['name']}" + chr(10) + str(case.get('error') or ''))
 for group, status in statuses.items():
     if status == 'FAILED':
         failure_details.append(f"Check failed: {group}; inspect the matching workflow step output.")
@@ -63,7 +74,7 @@ info = {
     'platform': 'Android emulator (API 35) and Ubuntu Linux',
     'cases': cases, 'groups': [{'name': k, 'status': statuses[k]} for k in results],
     'overall': overall, 'artifacts_url': run_url,
-    'screenshots': ['screenshots/gui-smoke.png'] if (out / 'screenshots/gui-smoke.png').exists() else [],
+    'screenshots': ['screenshots/gui-smoke.png'] if (out / 'screenshots/gui-smoke.png').is_file() and (out / 'screenshots/gui-smoke.png').stat().st_size > 0 else [],
     'failure_logs': ['fast-tests.stderr', 'bdd-tests.stderr', 'gui-tests.stderr'],
     'failure_details': failure_details,
 }
@@ -84,8 +95,8 @@ if info['failure_details']:
 else:
     md.append('No failure details recorded; failed and unrun checks are never represented as passing.')
 md += ['', '### GUI screenshot']
-md.append('- `screenshots/gui-smoke.png` (in this run artifact)' if info['screenshots'] else '- NOT GENERATED (GUI test may not have run or failed before capture)')
-md += ['', '### Downloadable artifacts', f"[Run artifacts and logs]({run_url})"]
+md.append('[screenshots/gui-smoke.png](screenshots/gui-smoke.png) (device screenshot inside this run artifact)' if info['screenshots'] else '- NOT GENERATED (GUI test may not have run or failed before capture)')
+md += ['', '### Downloadable artifacts', f"[Download this run’s report, screenshots, and logs]({run_url})"]
 report = '\n'.join(md) + '\n'
 (out / 'report.md').write_text(report)
 if os.getenv('GITHUB_STEP_SUMMARY'):

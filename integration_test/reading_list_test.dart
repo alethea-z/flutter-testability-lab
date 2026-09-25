@@ -12,6 +12,8 @@ void main() {
     await tester.tap(find.byKey(const Key('add-book')));
     await tester.pumpAndSettle();
     expect(find.text('GUI smoke book'), findsOneWidget);
+    await binding.convertFlutterSurfaceToImage();
+    await tester.pump();
     await binding.takeScreenshot('gui-smoke');
   });
 }
