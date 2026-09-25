@@ -69,6 +69,7 @@ jobs:
             artifacts/report.json
             artifacts/*.json
             artifacts/*.stderr
+            artifacts/*.stdout
             artifacts/persistence.exit
             artifacts/restarted-ui.xml
             artifacts/screenshots/**
