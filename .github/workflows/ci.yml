@@ -70,6 +70,7 @@ jobs:
             artifacts/*.json
             artifacts/*.stderr
             artifacts/*.stdout
+            artifacts/*.txt
             artifacts/persistence.exit
             artifacts/restarted-ui.xml
             artifacts/screenshots/**

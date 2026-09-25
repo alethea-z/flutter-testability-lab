@@ -68,7 +68,7 @@ for case in cases:
 for group, status in statuses.items():
     if status != 'PASSED':
         failure_details.append(f"Check {status}: {group}; inspect the matching workflow step output and captured logs.")
-for filename in ['fast-tests.stderr', 'bdd-tests.stderr', 'gui-tests.stderr']:
+for filename in ['fast-tests.stderr', 'bdd-tests.stderr', 'gui-tests.stderr', 'persistence.stderr']:
     path = out / filename
     if path.exists() and path.stat().st_size:
         failure_details.append(f"{filename}: {path.read_text(errors='replace')[-4000:]}")
