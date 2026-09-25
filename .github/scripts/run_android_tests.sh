@@ -12,7 +12,7 @@ adb exec-out screencap -p > artifacts/screenshots/gui-smoke.png
 screenshot_rc=$?
 
 adb shell am force-stop de.alethea.flutter_testability_lab
-adb shell am start -n de.alethea.flutter_testability_lab/.MainActivity
+adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p de.alethea.flutter_testability_lab
 start_rc=$?
 sleep 8
 adb shell uiautomator dump /sdcard/window.xml > artifacts/uiautomator.stdout 2> artifacts/uiautomator.stderr
