@@ -27,7 +27,10 @@ def read_test_events(filename):
         event_id = event.get('testID', event.get('test', {}).get('id'))
         if event.get('type') == 'testStart':
             test = event.get('test', {})
-            started[event_id] = (test.get('name', 'unknown'), event.get('time', 0), test.get('metadata', {}).get('skip', False))
+            name = test.get('name', 'unknown')
+            if name.startswith('loading '):
+                continue
+            started[event_id] = (name, event.get('time', 0), test.get('metadata', {}).get('skip', False))
         elif event.get('type') in ('error', 'print') and event_id is not None:
             message = event.get('error') or event.get('message')
             if message:
@@ -36,7 +39,7 @@ def read_test_events(filename):
             name, begin, metadata_skip = started.get(event_id, (f"test-{event_id}", event.get('time', 0), False))
             result = 'NOT RUN' if event.get('skipped') or metadata_skip else ('PASSED' if event.get('result') == 'success' else 'FAILED')
             finished.add(event_id)
-            details = event.get('error') or chr(10).join(failures.get(event_id, []))
+            details = chr(10).join(([str(event['error'])] if event.get('error') else []) + failures.get(event_id, []))
             cases.append({'name': name, 'status': result, 'duration_seconds': round(max(0, event.get('time', begin) - begin) / 1000, 3), 'error': str(details)[-4000:] if result == 'FAILED' else None})
     for event_id, (name, begin, metadata_skip) in started.items():
         if event_id not in finished:
@@ -59,11 +62,12 @@ now = datetime.datetime.now(datetime.timezone.utc).astimezone().isoformat()
 run_url = os.getenv('REPORT_ARTIFACT_URL', '')
 failure_details = []
 for case in cases:
-    if case['status'] == 'FAILED':
-        failure_details.append(f"Test case failed: {case['name']}" + chr(10) + str(case.get('error') or ''))
+    if case['status'] in ('FAILED', 'NOT RUN'):
+        reason = case.get('error') or 'No test completion event was recorded; inspect the workflow step logs.'
+        failure_details.append(f"Test case {case['status']}: {case['name']}" + chr(10) + str(reason))
 for group, status in statuses.items():
-    if status == 'FAILED':
-        failure_details.append(f"Check failed: {group}; inspect the matching workflow step output.")
+    if status != 'PASSED':
+        failure_details.append(f"Check {status}: {group}; inspect the matching workflow step output and captured logs.")
 for filename in ['fast-tests.stderr', 'bdd-tests.stderr', 'gui-tests.stderr']:
     path = out / filename
     if path.exists() and path.stat().st_size:
