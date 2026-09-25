@@ -7,13 +7,13 @@ mkdir -p artifacts/screenshots
 flutter test integration_test -d emulator-5554 --reporter=json > artifacts/gui-tests.json 2> artifacts/gui-tests.stderr
 test_rc=$?
 
-# Reinstall the same APK without clearing app data, then relaunch via its launcher intent.
+# Reinstall the same APK without clearing app data, then relaunch its verified activity.
 adb install -r build/app/outputs/flutter-apk/app-debug.apk > artifacts/install.stdout 2> artifacts/install.stderr
 install_rc=$?
 adb shell am force-stop de.alethea.flutter_testability_lab
-adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p de.alethea.flutter_testability_lab > artifacts/relaunch.stdout 2> artifacts/relaunch.stderr
+adb shell am start -W -n de.alethea.flutter_testability_lab/de.alethea.flutter_testability_lab.MainActivity > artifacts/relaunch.stdout 2> artifacts/relaunch.stderr
 start_rc=$?
-python3 -c "import pathlib,sys; t=' '.join(pathlib.Path(p).read_text(errors='replace') for p in ('artifacts/relaunch.stdout','artifacts/relaunch.stderr')); sys.exit(1 if ('unable to resolve' in t.lower() or 'error:' in t.lower()) else 0)" || start_rc=1
+python3 -c "import pathlib,sys; t=' '.join(pathlib.Path(p).read_text(errors='replace') for p in ('artifacts/relaunch.stdout','artifacts/relaunch.stderr')).lower(); sys.exit(1 if any(x in t for x in ('unable to resolve','error:','error type 3','does not exist')) else 0)" || start_rc=1
 sleep 8
 adb shell uiautomator dump /sdcard/window.xml > artifacts/uiautomator.stdout 2> artifacts/uiautomator.stderr
 dump_rc=$?
