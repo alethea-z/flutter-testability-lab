@@ -1,0 +1,76 @@
+name: Flutter testability lab
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Static analysis
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze
+      - name: Fast unit, BDD and widget tests
+        id: fast
+        continue-on-error: true
+        run: flutter test --reporter expanded
+      - name: Start Android emulator and run GUI / persistence tests
+        id: gui
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            flutter test integration_test -d emulator-5554 --reporter expanded
+            mkdir -p artifacts/screenshots
+            adb shell monkey -p de.alethea.flutter_testability_lab 1
+            sleep 5
+            adb exec-out screencap -p > artifacts/screenshots/gui-smoke.png
+      - name: Build Android APK
+        id: build
+        if: always()
+        continue-on-error: true
+        run: flutter build apk --debug
+      - name: Generate run report
+        if: always()
+        env:
+          ANALYZE: ${{ steps.analyze.outcome }}
+          FAST_TESTS: ${{ steps.fast.outcome }}
+          GUI_TESTS: ${{ steps.gui.outcome }}
+          APK_BUILD: ${{ steps.build.outcome }}
+          REPORT_ARTIFACT_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 tool/create_report.py
+      - name: Upload report, screenshots and APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testability-report-${{ github.run_id }}
+          path: |
+            artifacts/report.md
+            artifacts/report.json
+            artifacts/screenshots/**
+            build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: warn
+      - name: Enforce test and build outcomes
+        if: always()
+        env:
+          ANALYZE: ${{ steps.analyze.outcome }}
+          FAST_TESTS: ${{ steps.fast.outcome }}
+          GUI_TESTS: ${{ steps.gui.outcome }}
+          APK_BUILD: ${{ steps.build.outcome }}
+        run: |
+          printf 'analysis=%s fast=%s gui=%s build=%s\n' "$ANALYZE" "$FAST_TESTS" "$GUI_TESTS" "$APK_BUILD"
+          test "$ANALYZE" = success && test "$FAST_TESTS" = success && test "$GUI_TESTS" = success && test "$APK_BUILD" = success
