@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Flutter's integration runner can uninstall the test package at exit. Run the
-# production APK persistence scenario separately on one unchanged installation.
+# Drive the production installation directly; no instrumentation uninstall may erase data.
 set +e
 mkdir -p artifacts/screenshots
-timeout 900s flutter test integration_test -d emulator-5554 --reporter=json > artifacts/gui-tests.json 2> artifacts/gui-tests.stderr
-test_rc=$?
-adb logcat -d -t 1200 > artifacts/post-gui-logcat.txt 2>&1
-timeout 300s python3 tool/android_restart_test.py > artifacts/persistence.stdout 2> artifacts/persistence.stderr
-restart_rc=$?
-if [[ ! -f artifacts/persistence.exit ]]; then printf '%s\n' '1' > artifacts/persistence.exit; fi
-if [[ $test_rc -ne 0 || $restart_rc -ne 0 ]]; then
-  printf 'GUI test exit=%s; black-box restart exit=%s\n' "$test_rc" "$restart_rc" >&2
+if [[ ! -f artifacts/production.apk ]]; then
+  printf '%s\n' 'Android build did not produce artifacts/production.apk; device tests NOT RUN.' > artifacts/persistence.stderr
+  printf '%s\n' '1' > artifacts/persistence.exit
   exit 1
 fi
+timeout 420s python3 tool/android_restart_test.py > artifacts/persistence.stdout 2> artifacts/persistence.stderr
+rc=$?
+adb logcat -d -t 1200 > artifacts/post-gui-logcat.txt 2>&1
+if [[ ! -f artifacts/persistence.exit ]]; then printf '%s\n' '1' > artifacts/persistence.exit; fi
+exit "$rc"

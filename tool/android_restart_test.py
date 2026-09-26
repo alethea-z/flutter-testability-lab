@@ -1,8 +1,7 @@
 """Black-box Android add/force-stop/relaunch test on a single installed APK.
 
-Run after Flutter's integration-test runner exits: that runner uninstalls its app.
-This test creates its own entry AFTER installing the production APK and never
-reinstalls or clears data between writing and checking it.
+Install the production APK once, drive its UI, then force-stop and relaunch.
+No test instrumentation replaces the app or clears its data.
 """
 import json
 import pathlib
@@ -68,15 +67,21 @@ def launch():
 
 
 start = time.monotonic()
-result: dict[str, str | float] = {'name': 'PER-01 real app restart restores entry', 'status': 'FAILED'}
+restart_start = start
+gui: dict[str, str | float | None] = {'name': 'GUI-01 add a book through the running app', 'status': 'FAILED'}
+restart: dict[str, str | float | None] = {'name': 'PER-01 real app restart restores entry', 'status': 'NOT RUN'}
 try:
-    # This is the only APK install. No installation or data reset follows add.
+    # One installation only: no reinstall or data reset between add and relaunch.
     adb('install', '-r', 'artifacts/production.apk', timeout=180)
     launch()
     tap(await_node('Book title'))
     adb('shell', 'input', 'text', TITLE.replace(' ', '%s'))
     tap(await_node('Add book'))
     await_node(TITLE)
+    gui['status'] = 'PASSED'
+    gui['duration_seconds'] = round(time.monotonic() - start, 3)
+    restart_start = time.monotonic()
+    restart['status'] = 'FAILED'
     adb('shell', 'am', 'force-stop', PKG)
     launch()
     await_node(TITLE)
@@ -86,12 +91,18 @@ try:
         raise AssertionError('No valid PNG screenshot of the relaunched app')
     (ART / 'screenshots').mkdir(exist_ok=True)
     (ART / 'screenshots' / 'gui-smoke.png').write_bytes(screenshot.stdout)
-    result['status'] = 'PASSED'
+    restart['status'] = 'PASSED'
 except Exception as exc:
-    result['error'] = str(exc)
-    print(f"Restart test failed: {exc}", file=sys.stderr)
+    case = gui if gui['status'] != 'PASSED' else restart
+    case['error'] = str(exc)
+    print(f"Android GUI/restart test failed: {exc}", file=sys.stderr)
 finally:
-    result['duration_seconds'] = round(time.monotonic() - start, 3)
-    (ART / 'restart-result.json').write_text(json.dumps(result, indent=2) + '\n')
-    (ART / 'persistence.exit').write_text('0\n' if result['status'] == 'PASSED' else '1\n')
-sys.exit(0 if result['status'] == 'PASSED' else 1)
+    if 'duration_seconds' not in gui:
+        gui['duration_seconds'] = round(time.monotonic() - start, 3)
+    if restart['status'] != 'NOT RUN':
+        restart['duration_seconds'] = round(time.monotonic() - restart_start, 3)
+    else:
+        restart['duration_seconds'] = None
+    (ART / 'device-results.json').write_text(json.dumps([gui, restart], indent=2) + '\n')
+    (ART / 'persistence.exit').write_text('0\n' if restart['status'] == 'PASSED' else '1\n')
+sys.exit(0 if restart['status'] == 'PASSED' else 1)

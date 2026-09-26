@@ -55,13 +55,14 @@ flutter = run(['flutter', '--version']).splitlines()[0] or 'unknown'
 commit = os.getenv('GITHUB_SHA') or run(['git', 'rev-parse', 'HEAD'])
 results = {name: os.getenv(env, 'not_run') for name, env in [('analysis', 'ANALYZE'), ('unit_bdd_widget_group', 'FAST_TESTS'), ('android_device_tests', 'GUI_TESTS'), ('apk_build', 'APK_BUILD')]}
 statuses = {k: ('PASSED' if v == 'success' else 'FAILED' if v == 'failure' else 'NOT RUN') for k, v in results.items()}
-cases = read_test_events('fast-tests.json') + read_test_events('bdd-tests.json') + read_test_events('gui-tests.json')
-# The black-box restart driver writes a case only after actually running.
-restart_path = out / 'restart-result.json'
-if restart_path.exists():
-    cases.append(json.loads(restart_path.read_text()))
-elif os.getenv('GUI_TESTS') not in ('', 'not_run', 'skipped'):
-    cases.append({'name': 'PER-01 real app restart restores entry', 'status': 'NOT RUN', 'duration_seconds': None})
+cases = read_test_events('fast-tests.json') + read_test_events('bdd-tests.json')
+# Device results come from assertions performed by the black-box driver, never the step outcome.
+device_path = out / 'device-results.json'
+if device_path.exists():
+    cases.extend(json.loads(device_path.read_text()))
+else:
+    for name in ('GUI-01 add a book through the running app', 'PER-01 real app restart restores entry'):
+        cases.append({'name': name, 'status': 'NOT RUN', 'duration_seconds': None})
 # Screenshots are only valid when the same run's restart assertion passed.
 screenshot_path = out / 'screenshots/gui-smoke.png'
 screenshot_valid = (any(c['name'] == 'PER-01 real app restart restores entry' and c['status'] == 'PASSED' for c in cases)
@@ -90,7 +91,7 @@ for filename in ['fast-tests.stderr', 'bdd-tests.stderr', 'gui-tests.stderr', 'p
 info = {
     'workflow_run': os.getenv('GITHUB_RUN_ID', 'local'), 'commit_sha': commit,
     'timestamp': now, 'flutter_version': flutter,
-    'platform': 'Android emulator (API 35) and Ubuntu Linux',
+    'platform': 'Android emulator (API 36) and Ubuntu Linux',
     'cases': cases, 'groups': [{'name': k, 'status': statuses[k]} for k in results],
     'overall': overall, 'artifacts_url': run_url,
     'screenshots': ['screenshots/gui-smoke.png'] if (out / 'screenshots/gui-smoke.png').is_file() and (out / 'screenshots/gui-smoke.png').stat().st_size > 0 else [],
