@@ -47,7 +47,7 @@ jobs:
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 36
           arch: x86_64
           profile: pixel_2
           script: bash .github/scripts/run_android_tests.sh
