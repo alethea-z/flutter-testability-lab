@@ -51,11 +51,21 @@ commit = os.getenv('GITHUB_SHA') or run(['git', 'rev-parse', 'HEAD'])
 results = {name: os.getenv(env, 'not_run') for name, env in [('analysis', 'ANALYZE'), ('unit_bdd_widget_group', 'FAST_TESTS'), ('android_device_tests', 'GUI_TESTS'), ('apk_build', 'APK_BUILD')]}
 statuses = {k: ('PASSED' if v == 'success' else 'FAILED' if v == 'failure' else 'NOT RUN') for k, v in results.items()}
 cases = read_test_events('fast-tests.json') + read_test_events('bdd-tests.json') + read_test_events('gui-tests.json')
-# The process restart check is a separate assertion performed after force-stop/relaunch.
-persist_result = out / 'persistence.exit'
-if os.getenv('GUI_TESTS') not in ('', 'not_run', 'skipped'):
-    value = persist_result.read_text().strip() if persist_result.exists() else None
-    cases.append({'name': 'PER-01 process restart restores persisted entry', 'status': 'PASSED' if value == '0' else 'FAILED' if value is not None else 'NOT RUN', 'duration_seconds': None})
+# The black-box restart driver writes a case only after actually running.
+restart_path = out / 'restart-result.json'
+if restart_path.exists():
+    cases.append(json.loads(restart_path.read_text()))
+elif os.getenv('GUI_TESTS') not in ('', 'not_run', 'skipped'):
+    cases.append({'name': 'PER-01 real app restart restores entry', 'status': 'NOT RUN', 'duration_seconds': None})
+# Screenshots are only valid when the same run's restart assertion passed.
+screenshot_path = out / 'screenshots/gui-smoke.png'
+screenshot_valid = (any(c['name'] == 'PER-01 real app restart restores entry' and c['status'] == 'PASSED' for c in cases)
+                    and screenshot_path.is_file() and screenshot_path.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'))
+if not screenshot_valid and screenshot_path.exists():
+    screenshot_path.unlink()
+if not screenshot_valid and os.getenv('GUI_TESTS') == 'success':
+    cases.append({'name': 'GUI-SCREENSHOT-01 verified app screenshot', 'status': 'FAILED', 'duration_seconds': None,
+                  'error': 'A verified relaunched-app PNG screenshot was not produced.'})
 all_required = list(statuses.values()) + [case['status'] for case in cases]
 overall = 'PASSED' if all(s == 'PASSED' for s in all_required) and cases else 'FAILED' if any(s == 'FAILED' for s in all_required) else 'INCOMPLETE'
 now = datetime.datetime.now(datetime.timezone.utc).astimezone().isoformat()

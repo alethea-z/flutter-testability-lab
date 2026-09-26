@@ -34,6 +34,13 @@ jobs:
           flutter test test/bdd_test.dart --reporter=json > artifacts/bdd-tests.json 2> artifacts/bdd-tests.stderr
           bdd_rc=$?
           test $test_rc -eq 0 && test $bdd_rc -eq 0
+      - name: Build Android APK
+        id: build
+        continue-on-error: true
+        run: |
+          flutter build apk --debug
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/production.apk
       - name: Start Android emulator and run GUI / persistence tests
         id: gui
         timeout-minutes: 35
@@ -44,12 +51,6 @@ jobs:
           arch: x86_64
           profile: pixel_2
           script: bash .github/scripts/run_android_tests.sh
-
-      - name: Build Android APK
-        id: build
-        if: always()
-        continue-on-error: true
-        run: flutter build apk --debug
       - name: Generate run report
         if: always()
         env:
@@ -71,6 +72,7 @@ jobs:
             artifacts/*.stderr
             artifacts/*.stdout
             artifacts/*.txt
+            artifacts/*.log
             artifacts/persistence.exit
             artifacts/restarted-ui.xml
             artifacts/screenshots/**
