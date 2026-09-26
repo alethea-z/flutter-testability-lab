@@ -91,7 +91,7 @@ for filename in ['fast-tests.stderr', 'bdd-tests.stderr', 'gui-tests.stderr', 'p
 info = {
     'workflow_run': os.getenv('GITHUB_RUN_ID', 'local'), 'commit_sha': commit,
     'timestamp': now, 'flutter_version': flutter,
-    'platform': 'Android emulator (API 36) and Ubuntu Linux',
+    'platform': 'Android emulator (API 35) and Ubuntu Linux',
     'cases': cases, 'groups': [{'name': k, 'status': statuses[k]} for k in results],
     'overall': overall, 'artifacts_url': run_url,
     'screenshots': ['screenshots/gui-smoke.png'] if (out / 'screenshots/gui-smoke.png').is_file() and (out / 'screenshots/gui-smoke.png').stat().st_size > 0 else [],
