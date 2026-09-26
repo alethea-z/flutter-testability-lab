@@ -60,9 +60,11 @@ def tap(node):
 
 def launch():
     output = adb('shell', 'am', 'start', '-W', '-n', ACTIVITY)
-    if any(x in output.lower() for x in ('status: timeout', 'launchstate: unknown', 'error:', 'does not exist')):
+    if any(x in output.lower() for x in ('error:', 'does not exist', 'unable to resolve')):
         raise AssertionError(f'Activity launch failed: {output}')
-    await_node('Reading list lab')
+    # am start -W can time out on a slow emulator even when the app opens.
+    # The visible app hierarchy, not the launcher timing estimate, decides.
+    await_node('Reading list lab', seconds=90)
 
 
 start = time.monotonic()

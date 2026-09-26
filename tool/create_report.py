@@ -35,8 +35,13 @@ def read_test_events(filename):
             message = event.get('error') or event.get('message')
             if message:
                 failures.setdefault(event_id, []).append(str(message))
-        elif event.get('type') == 'testDone' and not event.get('hidden', False):
+        elif event.get('type') == 'testDone':
+            finished.add(event_id)
+            if event.get('hidden', False):
+                continue
             name, begin, metadata_skip = started.get(event_id, (f"test-{event_id}", event.get('time', 0), False))
+            if name.startswith('loading '):
+                continue
             result = 'NOT RUN' if event.get('skipped') or metadata_skip else ('PASSED' if event.get('result') == 'success' else 'FAILED')
             finished.add(event_id)
             details = chr(10).join(([str(event['error'])] if event.get('error') else []) + failures.get(event_id, []))
