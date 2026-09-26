@@ -71,8 +71,8 @@ restart_start = start
 gui: dict[str, str | float | None] = {'name': 'GUI-01 add a book through the running app', 'status': 'FAILED'}
 restart: dict[str, str | float | None] = {'name': 'PER-01 real app restart restores entry', 'status': 'NOT RUN'}
 try:
-    # One installation only: no reinstall or data reset between add and relaunch.
-    adb('install', '-r', 'artifacts/production.apk', timeout=180)
+    # This is the only APK install. No installation or data reset follows add.
+    adb('install', '-r', 'artifacts/production.apk', timeout=300)
     launch()
     tap(await_node('Book title'))
     adb('shell', 'input', 'text', TITLE.replace(' ', '%s'))
